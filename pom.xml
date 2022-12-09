@@ -14,7 +14,7 @@
         <maven.compiler.target>11</maven.compiler.target>
         <nuts.version>5.0.2</nuts.version>
         <openapi.spec.baseurl>https://raw.githubusercontent.com/nuts-foundation/nuts-node/v${nuts.version}/docs/_static</openapi.spec.baseurl>
-        <openapi.spec.dir>${project.build.outputDirectory}/spec</openapi.spec.dir>
+        <openapi.spec.dir>${project.basedir}/api</openapi.spec.dir>
         <!-- OpenAPI Generator properties -->
         <openapi.generator.maven.plugin.output>${project.basedir}/generated</openapi.generator.maven.plugin.output>
         <openapi.generator.maven.plugin.artifactVersion>1.0-SNAPSHOT</openapi.generator.maven.plugin.artifactVersion>
@@ -39,54 +39,6 @@
                         </fileset>
                     </filesets>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>download-spec</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <tasks>
-                                <!-- Commons -->
-                                <mkdir dir="${openapi.spec.dir}/common/"/>
-                                <get src="${openapi.spec.baseurl}/common/error_response.yaml"
-                                     dest="${openapi.spec.dir}/common/error_response.yaml"/>
-                                <!-- Change back to ${openapi.spec.baseurl}/common/ssi_types.yaml after https://github.com/nuts-foundation/nuts-node/pull/1728 has been merged -->
-                                <get src="https://raw.githubusercontent.com/nuts-foundation/nuts-node/openapi-common/docs/_static/common/ssi_types.yaml"
-                                     dest="${openapi.spec.dir}/common/ssi_types.yaml"/>
-                                <!-- VDR -->
-                                <mkdir dir="${openapi.spec.dir}/vdr/"/>
-                                <get src="${openapi.spec.baseurl}/vdr/v1.yaml"
-                                     dest="${openapi.spec.dir}/vdr/v1.yaml"/>
-                                <!-- VCR -->
-                                <mkdir dir="${openapi.spec.dir}/vcr/"/>
-                                <get src="${openapi.spec.baseurl}/vcr/v2.yaml"
-                                     dest="${openapi.spec.dir}/vcr/v2.yaml"/>
-                                <!-- DIDMan -->
-                                <mkdir dir="${openapi.spec.dir}/didman/"/>
-                                <get src="${openapi.spec.baseurl}/didman/v1.yaml"
-                                     dest="${openapi.spec.dir}/didman/v1.yaml"/>
-                                <!-- Network -->
-                                <mkdir dir="${openapi.spec.dir}/network/"/>
-                                <get src="${openapi.spec.baseurl}/network/v1.yaml"
-                                     dest="${openapi.spec.dir}/network/v1.yaml"/>
-                                <!-- Crypto -->
-                                <mkdir dir="${openapi.spec.dir}/crypto/"/>
-                                <get src="${openapi.spec.baseurl}/crypto/v1.yaml"
-                                     dest="${openapi.spec.dir}/crypto/v1.yaml"/>
-                                <!-- Auth -->
-                                <mkdir dir="${openapi.spec.dir}/auth/"/>
-                                <get src="${openapi.spec.baseurl}/auth/v1.yaml"
-                                     dest="${openapi.spec.dir}/auth/v1.yaml"/>
-                            </tasks>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <groupId>org.openapitools</groupId>

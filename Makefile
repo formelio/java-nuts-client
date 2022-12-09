@@ -7,3 +7,6 @@ regenerate:
 
 build-install:
 	cd generated && mvn install
+
+clean:
+	mvn clean

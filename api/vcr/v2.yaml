@@ -1,0 +1,643 @@
+openapi: "3.0.0"
+info:
+  title: Nuts Verifiable Credential API spec
+  description: |
+    API specification for common operations on Verifiable credentials.
+    It allows the three roles, issuer, holder and verifier to issue, revoke, search, present and verify credentials.
+  version: 2.0.0
+  license:
+    name: GPLv3
+servers:
+  - url: http://localhost:1323
+paths:
+  /internal/vcr/v2/vc/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: URL encoded ID.
+        required: true
+        example: "did:nuts:B8PUHs2AUHbFF1xLLK4eZjgErEcMXHxs68FteY7NDtCY#c4199b74-0c0a-4e09-a463-6927553e65f5"
+        schema:
+          type: string
+    get:
+      summary: "Resolves a verifiable credential"
+      description: >
+        Returns the resolved credential, regardless of its revocation/trust state.
+
+        error returns:
+        * 404 - Corresponding credential could not be found
+        * 500 - An error occurred while processing the request
+      operationId: "resolveVC"
+      tags:
+        - credential
+      responses:
+        "200":
+          description: Credential has been found and is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifiableCredential'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/search:
+    post:
+      summary: "Searches for verifiable credentials that could be used for different use-cases."
+      description: >
+        The result contains a list of matching credentials. Only verified credentials are returned.
+        The search parameters define how the raw results are filtered.
+
+        error returns:
+        * 400 - Incorrect search query
+        * 500 - An error occurred while processing the request
+      operationId: "searchVCs"
+      requestBody:
+        required: true
+        description: >
+          Searching for VCs is done by passing a JSON-LD document as query.
+          Each field in the request body must be present in the VC in order for it to be passed as result.
+          Different JSON-LD contexts can be used allowing for different JSON formats. Consult the node documentation on the supported contexts.
+          The type of the credential must contain "VerifiableCredential" and the additional Nuts credential type that matches the credentialSubject context.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchVCRequest'
+            examples:
+              NutsOrganizationCredential:
+                value:
+                  {
+                    "query": {
+                      "@context": ["https://www.w3.org/2018/credentials/v1","https://nuts.nl/credentials/v1"],
+                      "type": ["VerifiableCredential", "NutsOrganizationCredential"],
+                      "credentialSubject":{
+                        "organization": {
+                          "name": "Zorggroep de Nootjes",
+                          "city": "Amandelmere"
+                        }
+                      }
+                    }
+                  }
+              NutsAuthorizationCredential:
+                value:
+                  {
+                    "query": {
+                      "@context": ["https://www.w3.org/2018/credentials/v1","https://nuts.nl/credentials/v1"],
+                      "type": ["VerifiableCredential", "NutsAuthorizationCredential"],
+                      "credentialSubject":{
+                        "id": "did:nuts:123",
+                        "purposeOfUse": "eOverdracht-receiver",
+                        "resources": {
+                          "path":"/Task/123"
+                        },
+                        "subject": "urn:oid:2.16.840.1.113883.2.4.6.3:123456782"
+                      }
+                    },
+                    "searchOptions": {
+                      "allowUntrustedIssuer": true
+                    }
+                  }
+      tags:
+        - credential
+      responses:
+        "200":
+          description: A list of matching credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchVCResults'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/issuer/vc:
+    post:
+      summary: Issues a new Verifiable Credential
+      description: |
+        Issues a new Verifiable Credential for provided type in the context.
+
+        error returns:
+        * 400 - One or more of the given parameters are invalid
+        * 412 - A private transaction is issued for a subject that does not have a NutsComm address
+        * 500 - An error occurred while processing the request
+      operationId: "issueVC"
+      tags:
+        - credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueVCRequest'
+      responses:
+        "200":
+          description: "New VC has been created successfully. Returns the Verifiable Credential."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifiableCredential'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/issuer/vc/search:
+    get:
+      summary: "Searches for verifiable credentials issued by this node which matches the search params"
+      description: >
+        The SearchVCResult contains a list of matching credentials regardless of the validity.
+        The entry may contain a revocation which means the credential has been revoked.
+
+        error returns:
+        * 400 - Invalid search parameters
+        * 500 - An error occurred while processing the request
+      operationId: "searchIssuedVCs"
+      parameters:
+        - name: credentialType
+          in: query
+          description: The type of the credential
+          example: NutsOrganizationCredential
+          required: true
+          schema:
+            type: string
+        - name: issuer
+          in: query
+          description: the DID of the issuer
+          example: did:nuts:123
+          required: true
+          schema:
+            type: string
+        - name: subject
+          in: query
+          description: the URI which indicates the subject (usually a DID)
+          example: did:nuts:456
+          required: false
+          schema:
+            type: string
+      tags:
+        - credential
+      responses:
+        "200":
+          description: A list of matching credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchVCResults'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/issuer/vc/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: URL encoded ID.
+        required: true
+        example: "did:nuts:B8PUHs2AUHbFF1xLLK4eZjgErEcMXHxs68FteY7NDtCY#c4199b74-0c0a-4e09-a463-6927553e65f5"
+        schema:
+          type: string
+    delete:
+      summary: "Revoke an issued credential"
+      description: |
+        Revoke a credential.
+
+        error returns:
+        * 400 - Credential can't be revoked. Most likely due to a missing private key.
+        * 404 - Credential is not found
+        * 409 - Credential has already been revoked
+        * 500 - An error occurred while processing the request
+      operationId: "revokeVC"
+      tags:
+        - credential
+      responses:
+        "200":
+          description: Revocation has been processed locally. It has also been published to the network.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Revocation'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/verifier/vc:
+    post:
+      summary: Verifies a Verifiable Credential
+      description: |
+        Verifies a Verifiable Credential. It checks:
+        * The signature
+        * Expiration
+        * Revocation status
+        * If the issuer is trusted
+        * If the issuer was not deactivated at time of issuing
+
+        error returns:
+        * 400 - One or more of the given parameters are invalid
+        * 500 - An error occurred while processing the request
+      operationId: "verifyVC"
+      tags:
+        - credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VCVerificationRequest'
+      responses:
+        "200":
+          description: "The verification result"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VCVerificationResult'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/verifier/vp:
+    post:
+      summary: Verifies a Verifiable Presentation
+      description: |
+        Verifies a Verifiable Presentation. It checks:
+        * Signature of the verifiable presentation and the verifiable credentials
+        * Expiration
+        * Revocation status
+        * If the issuers of the verifiable credentials are trusted
+        * If the issuers of the verifiable credentials were not deactivated at time of issuing
+
+        If the verification can be performed successfully (regardless whether checks failed), HTTP status 200 is returned.
+        Callers MUST observe the "validity" field of the verification result to check whether the VP is valid.
+
+        error returns:
+        * 400 - A parameter or the format of the verifiable presentation is invalid
+        * 500 - An error occurred while processing the request
+      operationId: "verifyVP"
+      tags:
+        - credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VPVerificationRequest'
+      responses:
+        "200":
+          description: "The verification result"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VPVerificationResult'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/verifier/trust:
+    post:
+      summary: Mark all the VCs of given type and issuer as 'trusted'.
+      description: |
+        The added trust is persisted and may be removed with a delete operation.
+
+        error returns:
+        * 400 - Invalid parameters
+        * 500 - An error occurred while processing the request
+      operationId: "trustIssuer"
+      tags:
+        - credential
+      requestBody:
+        required: true
+        description: a issuer/credentialType combination
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialIssuer"
+      responses:
+        "204":
+          description: The change was accepted.
+        default:
+          $ref: '../common/error_response.yaml'
+    delete:
+      summary: Remove trust in an issuer/credentialType combination
+      description: |
+        The removed trust is persisted.
+
+        error returns:
+        * 400 - Invalid parameters
+        * 500 - An error occurred while processing the request
+      operationId: "untrustIssuer"
+      tags:
+        - credential
+      requestBody:
+        required: true
+        description: a issuer/credentialType combination
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialIssuer"
+      responses:
+        "204":
+          description: The change was accepted.
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/verifier/{credentialType}/trusted:
+    get:
+      summary: "List all trusted issuers for a given credential type"
+      description: |
+        List all trusted issuers for a given credential type.
+
+        error returns:
+        * 400 - Malformed credential type
+        * 404 - Unknown credential type
+      operationId: "listTrusted"
+      tags:
+        - credential
+      parameters:
+        - name: credentialType
+          in: path
+          description: URL encoded Verifiable Credential Type.
+          required: true
+          example: "NutsOrganizationCredential"
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of trusted issuers is returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DID'
+        default:
+          $ref: '../common/error_response.yaml'
+  /internal/vcr/v2/verifier/{credentialType}/untrusted:
+    get:
+      summary: "List all untrusted issuers for a given credential type"
+      description: |
+        List all untrusted issuers for a given credential type.
+
+        error returns:
+        * 400 - Malformed credential type
+        * 404 - Unknown credential type
+      operationId: "listUntrusted"
+      tags:
+        - credential
+      parameters:
+        - name: credentialType
+          in: path
+          description: URL encoded Verifiable Credential Type.
+          required: true
+          example: "NutsOrganizationCredential"
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of untrusted issuers is returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DID'
+        default:
+          $ref: '../common/error_response.yaml'
+
+  /internal/vcr/v2/holder/vp:
+    post:
+      summary: Create a new Verifiable Presentation for a set of Verifiable Credentials.
+      description: |
+        Given a list of VCs, create a new presentation.
+
+        error returns:
+        * 400 - Invalid parameters
+        * 500 - An error occurred while processing the request
+      operationId: createVP
+      tags:
+        - credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVPRequest"
+      responses:
+        "200":
+          description: The verifiable presentation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifiablePresentation"
+
+
+
+components:
+  schemas:
+    IssueVCRequest:
+      type: object
+      description: A request for issuing a new Verifiable Credential.
+      required:
+        - type
+        - issuer
+        - credentialSubject
+      properties:
+        "@context":
+          description: |
+            The resolvable context of the credentialSubject as URI. If omitted, the "https://nuts.nl/credentials/v1" context is used.
+            Note: it is not needed to provide the "https://www.w3.org/2018/credentials/v1" context here.
+          type: string
+          example: "http://schema.org"
+          default: "https://nuts.nl/credentials/v1"
+        type:
+          description: Type definition for the credential.
+          type: string
+          example: "NutsOrganizationCredential"
+        issuer:
+          description: DID according to Nuts specification.
+          type: string
+          example: "did:nuts:B8PUHs2AUHbFF1xLLK4eZjgErEcMXHxs68FteY7NDtCY"
+        expirationDate:
+          description: rfc3339 time string until when the credential is valid.
+          type: string
+          example: "2012-01-02T12:00:00Z"
+        publishToNetwork:
+          description: |
+            If set, the node publishes this credential to the network. This is the default behaviour.
+            When set to false, the caller is responsible for distributing the VC to a holder. When the issuer is
+            also the holder, it then can be used to directly create a presentation (self issued).
+            Note: a not published credential can still be publicly revoked.
+          type: boolean
+          default: true
+        visibility:
+            description: |
+              When publishToNetwork is true, the credential can be published publicly or privately to the holder.
+              This field is mandatory if publishToNetwork is true to prevent accidents. It defaults to "private".
+            type: string
+            enum: [ public, private ]
+            default: private
+        credentialSubject:
+          $ref: '#/components/schemas/CredentialSubject'
+    VerifiableCredential:
+      $ref: '../common/ssi_types.yaml#/components/schemas/VerifiableCredential'
+    SearchVCRequest:
+      type: object
+      description: request body for searching VCs
+      required:
+        - query
+      properties:
+        searchOptions:
+          $ref: "#/components/schemas/SearchOptions"
+        query:
+          type: object
+          description: A partial VerifiableCredential in JSON-LD format. Each field will be used to match credentials against. All fields MUST be present.
+    SearchVCResults:
+      type: object
+      description: result of a Search operation.
+      required:
+        - verifiableCredentials
+      properties:
+        verifiableCredentials:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchVCResult"
+    SearchVCResult:
+      type: object
+      description: result of a Search operation.
+      required:
+        - verifiableCredential
+      properties:
+        revocation:
+          $ref: "#/components/schemas/Revocation"
+        verifiableCredential:
+          $ref: "#/components/schemas/VerifiableCredential"
+    SearchOptions:
+      type: object
+      properties:
+        allowUntrustedIssuer:
+          description: If set to true, VCs from an untrusted issuer are returned.
+          type: boolean
+          default: false
+    Revocation:
+      type: object
+      description: Credential revocation record
+      required:
+        - issuer
+        - subject
+        - date
+      properties:
+        issuer:
+          $ref: '#/components/schemas/DID'
+        subject:
+          type: string
+          description: subject refers to the credential identifier that is revoked (not the credential subject)
+        reason:
+          type: string
+          description: reason describes why the VC has been revoked
+        date:
+          type: string
+          description: date is a rfc3339 formatted datetime.
+        proof:
+          type: object
+          description: Proof contains the cryptographic proof(s).
+    DID:
+      $ref: '../common/ssi_types.yaml#/components/schemas/DID'
+    CredentialSubject:
+      $ref: '../common/ssi_types.yaml#/components/schemas/CredentialSubject'
+
+    VCVerificationRequest:
+      required:
+        - verifiableCredential
+      properties:
+        verifiableCredential:
+          $ref: "#/components/schemas/VerifiableCredential"
+        verificationOptions:
+          $ref: "#/components/schemas/VCVerificationOptions"
+    VCVerificationOptions:
+      type: object
+      properties:
+        allowUntrustedIssuer:
+          description: If set to true, an untrusted credential issuer is allowed.
+          type: boolean
+          default: false
+    VCVerificationResult:
+      description: Contains the verifiable credential verification result.
+      type: object
+      required:
+        - validity
+      properties:
+        validity:
+          type: boolean
+          description: Indicates the validity of the signature, issuer and revocation state.
+        message:
+          type: string
+          description: Indicates what went wrong
+
+    CreateVPRequest:
+      type: object
+      description: A request for creating a new Verifiable Presentation for a set of Verifiable Credentials.
+      required:
+        - verifiableCredentials
+      properties:
+        verifiableCredentials:
+          type: array
+          items:
+            $ref: "#/components/schemas/VerifiableCredential"
+        signerDID:
+          description: |
+            Specifies the DID of the signing party that must be used to create the digital signature.
+            If not specified, it is derived from the given Verifiable Credentials' subjectCredential ID.
+            It can only be derived if all given Verifiable Credentials have the same, single subjectCredential.
+          type: string
+          format: uri
+        proofPurpose:
+          type: string
+          description: |
+            The specific intent for the proof, the reason why an entity created it. Acts as a safeguard to prevent the
+            proof from being misused for a purpose other than the one it was intended for.
+        challenge:
+          type: string
+          description: |
+            A random or pseudo-random value used by some authentication protocols to mitigate replay attacks.
+        domain:
+          type: string
+          description: |
+            A string value that specifies the operational domain of a digital proof. This could be an Internet domain
+            name like example.com, an ad-hoc value such as mycorp-level3-access, or a very specific transaction value
+            like 8zF6T$mqP. A signer could include a domain in its digital proof to restrict its use to particular
+            target, identified by the specified domain.
+        expires:
+          type: string
+          description: Date and time at which proof will expire. If omitted, the proof does not have an end date.
+          example: '2021-12-20T09:00:00Z'
+
+    VPVerificationRequest:
+      required:
+        - verifiablePresentation
+      properties:
+        verifiablePresentation:
+          $ref: "#/components/schemas/VerifiablePresentation"
+        validAt:
+          type: string
+          description: Date and time at which the VP should be valid. If not supplied, the current date/time is used.
+          example: '2021-12-20T09:00:00Z'
+        verifyCredentials:
+          type: boolean
+          description: Indicates whether the Verifiable Credentials within the VP must be verified, default true.
+          default: true
+    VPVerificationResult:
+      description: Contains the verifiable presentation verification result.
+      type: object
+      required:
+        - validity
+      properties:
+        validity:
+          type: boolean
+          description: Indicates the validity of the signature, issuer and revocation state.
+        message:
+          type: string
+          description: Indicates what went wrong
+        credentials:
+          description: If the VP is valid, it will contain the credentials inside the VP.
+          type: array
+          items:
+            $ref: '#/components/schemas/VerifiableCredential'
+
+    VerifiablePresentation:
+      $ref: '../common/ssi_types.yaml#/components/schemas/VerifiablePresentation'
+    CredentialIssuer:
+      type: object
+      required:
+        - issuer
+        - credentialType
+      properties:
+        issuer:
+          description: the DID of an issuer
+          example: "did:nuts:B8PUHs2AUHbFF1xLLK4eZjgErEcMXHxs68FteY7NDtCY"
+          type: string
+        credentialType:
+          description: a credential type
+          example: NutsOrganizationCredential
+          type: string
