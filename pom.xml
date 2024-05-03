@@ -17,7 +17,7 @@
         <openapi.spec.dir>${project.basedir}/api</openapi.spec.dir>
         <!-- OpenAPI Generator properties -->
         <openapi.generator.maven.plugin.output>${project.basedir}/generated</openapi.generator.maven.plugin.output>
-        <openapi.generator.maven.plugin.artifactVersion>1.0-SNAPSHOT</openapi.generator.maven.plugin.artifactVersion>
+        <openapi.generator.maven.plugin.artifactVersion>5.3.2+formelio</openapi.generator.maven.plugin.artifactVersion>
     </properties>
 
     <dependencies>
@@ -115,7 +115,7 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <inputSpec>${openapi.spec.dir}/vcr/v2.yaml</inputSpec>
+                            <inputSpec>${openapi.spec.dir}/vcr/vcr_v2.yaml</inputSpec>
                             <configOptions>
                                 <apiPackage>nl.reinkrul.nuts.vcr</apiPackage>
                                 <modelPackage>nl.reinkrul.nuts.vcr</modelPackage>

@@ -9,12 +9,27 @@ servers:
   - url: http://localhost:1323
 paths:
   /internal/network/v1/transaction:
+    parameters:
+      - name: start
+        description: "Inclusive start of range (in lamport clock); default=0"
+        example: 1
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+      - name: end
+        description: "Exclusive stop of range (in lamport clock); default=∞"
+        example: 1000
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
     get:
-      summary: "Lists the transactions on the DAG"
+      summary: "Lists transactions on the DAG"
       description: >
-        Lists all transactions on the DAG. Since this call returns all transactions on the DAG, care should be taken when there
-        are many of them.
-        TODO: By then we'd need a more elaborate querying interface (ranging over timestamps/hashes, pagination, filtering, etc).
+        Lists transactions on the DAG. Since this call returns all transactions on the DAG, care should be taken when there are many of them. A range (start,end) are recommended at all times to avoid overloading the endpoint.
 
         error returns:
         * 500 - internal server error
@@ -130,7 +145,7 @@ paths:
       summary: "Visualizes the DAG as a graph"
       description: >
         Renders the transactions in the requested range, or the entire graph if no range is specified.
-        By default it renders in Graphviz format, which can be rendered to an image using `dot`.
+        By default it renders in Graphviz format, which can be rendered to an image using `dot`. 
 
         error returns:
         * 400 - invalid range
@@ -155,7 +170,7 @@ paths:
         The supported type values correspond with the transaction content-types.
         Transactions are not verified and added to an in-memory queue. For large sets of transactions, memory usage can become high.
         The API returns immediately.
-
+        
         error returns:
         * 400 - missing type
       parameters:
@@ -179,7 +194,7 @@ paths:
         New transactions will cause events to be omitted. In normal operation no events should remain.
         The diagnostics page displays the number of failed events. If there are any, this API can be used to get the cause.
         Events are listed by subscriber.
-
+        
         error returns:
         * 500 - internal server error
       operationId: "ListEvents"
@@ -196,6 +211,21 @@ paths:
                   $ref: '#/components/schemas/EventSubscriber'
         default:
           $ref: '../common/error_response.yaml'
+  /internal/network/v1/addressbook:
+    get:
+      summary: "Get the address book, listing which nodes will be connected to."
+      operationId: "getAddressBook"
+      tags:
+        - diagnostics
+      responses:
+        "200":
+          description: "Successfully listed the address book"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contact'
 components:
   schemas:
     Event:
@@ -215,6 +245,9 @@ components:
         retries:
           description: Number of times the event has been retried.
           type: integer
+        latest_notification_attempt:
+          description: "Timestamp of the most recent notification attempt. Formatted according to RFC3339. Note: calculation of the next attempt does not use this timestamp."
+          type: string
         transaction:
           description: The transaction reference
           type: string
@@ -259,3 +292,23 @@ components:
         softwareVersion:
           description: Indication of the software version of the node. It's recommended to use a (Git) commit ID that uniquely resolves to a code revision, alternatively a semantic version could be used (e.g. 1.2.5).
           type: string
+    Contact:
+      type: object
+      description: Describes the contact information of a node.
+      required:
+        - address
+        - attempts
+      properties:
+        address:
+          description: Address of the node.
+          type: string
+        did:
+          description: DID of the node.
+          type: string
+        attempts:
+          description: Number of connection attempts since the node has (re-)started. It is reset to 0 when the connection succeeds.
+          type: integer
+        lastAttempt:
+          description: Timestamp of the last attempt to contact the address.
+          type: string
+          format: date-time
